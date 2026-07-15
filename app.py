@@ -1,90 +1,85 @@
 #!/usr/bin/env python3
 """
-Makropad — konfigurator med grafisk grensesnitt.
+Makropad — grafisk konfigurator.
 
-Start:  .venv/bin/python app.py
-Åpner http://127.0.0.1:8777 i nettleseren.
+Redigerer profiles.yaml: hva hver tast og knott gjør, per app. Daemonen plukker opp
+endringene med det samme du lagrer.
+
+    .venv/bin/python app.py        # åpner http://127.0.0.1:8777
 """
 import http.server
 import json
 import os
 import socketserver
+import subprocess
 import threading
 import webbrowser
 
+import yaml
+
+import actions
 import device
+import signals
 import xzkj
 
 PORT = 8777
 HERE = os.path.dirname(os.path.abspath(__file__))
-STATE_PATH = os.path.join(HERE, "bindings.json")
+PROFILES = os.path.join(HERE, "profiles.yaml")
+EXAMPLE = os.path.join(HERE, "profiles.example.yaml")
 
 
-def load_state():
-    if os.path.exists(STATE_PATH):
-        with open(STATE_PATH) as f:
-            return json.load(f)
-    return {"layer": 1, "bindings": {}}
+def load_profiles():
+    path = PROFILES if os.path.exists(PROFILES) else EXAMPLE
+    with open(path) as f:
+        p = yaml.safe_load(f) or {}
+    p.setdefault("default", {})
+    p.setdefault("apps", {})
+    return p
 
 
-def save_state(state):
-    with open(STATE_PATH, "w") as f:
-        json.dump(state, f, indent=2, ensure_ascii=False)
+def save_profiles(p):
+    p.setdefault("default", {})
+    p.setdefault("apps", {})
+    with open(PROFILES, "w") as f:
+        yaml.safe_dump(p, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
 
 
-def parse_spec(spec: str):
-    """'cmd+c' | 'h,e,i' | 'mouse:left' -> ('kbd', entries) | ('mouse', mask)"""
-    spec = str(spec).strip().lower()
-    if not spec:
-        return None
-    if spec.startswith("mouse:"):
-        btn = {"left": 1, "right": 2, "middle": 4}.get(spec[6:])
-        if btn is None:
-            raise ValueError(f"Ukjent museknapp: {spec[6:]}")
-        return ("mouse", btn)
-    entries = []
-    for chord in spec.split(","):
-        chord = chord.strip()
-        delay = 0
-        if "@" in chord:
-            chord, d = chord.rsplit("@", 1)
-            delay = int(d)
-        parts = [p.strip() for p in chord.split("+")]
-        for m in parts[:-1]:
-            if m not in xzkj.MODIFIERS:
-                raise ValueError(f"Ukjent modifikator: {m}")
-            entries.append((0, xzkj.MODIFIERS[m]))
-        key = parts[-1]
-        if key in xzkj.MODIFIERS:
-            entries.append((delay, xzkj.MODIFIERS[key]))
-        elif key in xzkj.HID_CODES:
-            entries.append((delay, xzkj.HID_CODES[key]))
-        else:
-            raise ValueError(f"Ukjent tast: {key}")
-    if not 1 <= len(entries) <= 18:
-        raise ValueError(f"{len(entries)} trykk — maks 18")
-    return ("kbd", entries)
+def running_apps():
+    """Apper med vindu — til app-velgeren."""
+    try:
+        from AppKit import NSWorkspace
+        out = []
+        for a in NSWorkspace.sharedWorkspace().runningApplications():
+            if a.activationPolicy() == 0 and a.bundleIdentifier():
+                out.append({"name": a.localizedName(), "bundle": a.bundleIdentifier()})
+        return sorted(out, key=lambda x: x["name"].lower())
+    except Exception:
+        return []
 
 
-def flash(state):
-    parsed = []
-    for target, spec in state["bindings"].items():
-        p = parse_spec(spec)
-        if p:
-            parsed.append((device.resolve(target), p))
-    if not parsed:
-        return 0
+def flash_signals():
+    plan = []
+    for t in signals.TARGETS:
+        parts = signals.spec_for(t).split("+")
+        entries = [(0, xzkj.MODIFIERS[m]) for m in parts[:-1]]
+        entries.append((0, xzkj.HID_CODES[parts[-1]]))
+        plan.append((device.resolve(t), entries))
     h = xzkj.open_vendor_interface()
     try:
-        for key_id, (kind, val) in parsed:
-            if kind == "kbd":
-                xzkj.bind_key_sequence(h, key_id, val, state.get("layer", 1))
-            else:
-                xzkj.bind_mouse_click(h, key_id, val, state.get("layer", 1))
+        for kid, entries in plan:
+            xzkj.bind_key_sequence(h, kid, entries, layer=1)
         xzkj.finish(h)
     finally:
         h.close()
-    return len(parsed)
+    return len(plan)
+
+
+def daemon_running():
+    try:
+        out = subprocess.run(["pgrep", "-f", "daemon.py"], capture_output=True, text=True)
+        return bool(out.stdout.strip())
+    except Exception:
+        return False
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -109,17 +104,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
         elif self.path == "/api/state":
-            st = load_state()
-            st["keys"] = sorted(xzkj.HID_CODES)
-            st["mods"] = sorted(set(xzkj.MODIFIERS))
-            self._json(st)
-        elif self.path == "/api/device":
+            self._json({
+                "profiles": load_profiles(),
+                "targets": signals.TARGETS,
+                "media": sorted(actions.NX),
+                "keys": sorted(actions.VK),
+                "saved": os.path.exists(PROFILES),
+            })
+        elif self.path == "/api/status":
             try:
-                h = xzkj.open_vendor_interface()
-                h.close()
-                self._json({"connected": True})
-            except Exception as e:
-                self._json({"connected": False, "error": str(e)})
+                h = xzkj.open_vendor_interface(); h.close()
+                connected = True
+            except Exception:
+                connected = False
+            self._json({"connected": connected, "daemon": daemon_running()})
+        elif self.path == "/api/apps":
+            self._json({"apps": running_apps()})
         else:
             self.send_error(404)
 
@@ -127,18 +127,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length", 0))
         data = json.loads(self.rfile.read(n) or "{}")
         if self.path == "/api/save":
-            save_state(data)
+            save_profiles(data)
             self._json({"ok": True})
-        elif self.path == "/api/flash":
-            save_state(data)
-            try:
-                count = flash(data)
-                self._json({"ok": True, "count": count})
-            except Exception as e:
-                self._json({"ok": False, "error": str(e)}, 200)
         elif self.path == "/api/validate":
             try:
-                parse_spec(data.get("spec", ""))
+                actions.validate(data.get("action", ""))
+                self._json({"ok": True})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
+        elif self.path == "/api/flash":
+            try:
+                self._json({"ok": True, "count": flash_signals()})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
+        elif self.path == "/api/test":
+            try:
+                actions.run(data.get("action", ""))
                 self._json({"ok": True})
             except Exception as e:
                 self._json({"ok": False, "error": str(e)})

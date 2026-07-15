@@ -21,64 +21,64 @@ hidutil list | grep 514c
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install hidapi pyyaml
+.venv/bin/pip install hidapi pyyaml pyobjc-framework-Quartz pyobjc-framework-Cocoa
 .venv/bin/python app.py          # åpner http://127.0.0.1:8777
 ```
 
 <img src="design/taktil_stillhet_makropad.png" width="720" alt="Grensesnitt">
 
-Klikk en tast eller knott, skriv inn bindingen, trykk **Skriv til tastatur**.
+1. **Klargjør padden** — én gang. Skriver 24 usynlige signaler til tastaturet.
+2. Klikk en tast eller knott i tegningen, velg hva den skal gjøre.
+3. Start daemonen: `.venv/bin/python daemon.py`
 
-### CLI-alternativ
+Padden trenger aldri reflashes igjen. Alt du endrer i grensesnittet får virkning
+umiddelbart — daemonen laster profilen på nytt når den lagres.
 
-```bash
-.venv/bin/python macroctl.py flash config.example.yaml
-.venv/bin/python macroctl.py validate config.example.yaml
-.venv/bin/python macroctl.py list-keys
-```
+**Tilgjengelighet kreves** for daemonen: Systeminnstillinger → Personvern og sikkerhet
+→ Tilgjengelighet → legg til programmet du starter den fra.
 
-## Bindingssyntaks
+## Hva en tast kan gjøre
 
-| Eksempel | Betydning |
-|---|---|
-| `cmd+c` | Cmd + C |
-| `cmd+shift+4` | flere modifikatorer |
-| `h,e,i` | sekvens av trykk (maks 18 inkl. modifikatorer) |
-| `c@100` | 100 ms forsinkelse før trykket |
-| `volumeup` / `volumedown` / `mute` | volumkontroll |
-| `mouse:left` | museklikk (`left` / `right` / `middle`) |
+| Type | Eksempel | |
+|---|---|---|
+| `media` | `playpause` `next` `prev` `mute` `volumeup` | via macOS' egne media-taster |
+| `key` | `cmd+c` `cmd+shift+4` | send en tastekombinasjon |
+| `app` | `Spotify` | aktiver eller start en app |
+| `url` | `https://…` | åpne en lenke |
+| `shell` | `say ferdig` | kjør en kommando |
 
-Modifikatorer: `cmd` `shift` `alt` `ctrl`, samt `rshift`, `ralt` osv. for høyre side.
-Hver knott gir tre uavhengige bindinger: **vri venstre · trykk · vri høyre**.
+Hver knott gir tre uavhengige handlinger: **vri venstre · trykk · vri høyre**.
 
-## App-avhengige taster
+### Per app
 
-Vil du at samme knott skal spole i Spotify og zoome i VS Code — eller ha play/pause i
-det hele tatt — kjører du daemonen. Padden flashes med 24 usynlige signaler, og
-daemonen oversetter dem etter hvilken app som er i front:
-
-```bash
-.venv/bin/python setup_daemon.py       # flash signalene — én gang
-cp profiles.example.yaml profiles.yaml
-.venv/bin/python daemon.py             # krever Tilgjengelighet-tilgang
-```
+Legg til en app med **+** i grensesnittet, så overstyrer du bare tastene du vil ha
+annerledes der — resten arves fra standardprofilen (vist nedtonet i tegningen).
+Samme knott kan spole i Spotify og zoome i VS Code.
 
 ```yaml
 default:
   knob3.press: media:playpause
-  key5:        key:cmd+c
-
 apps:
   com.spotify.client:
     knob3.left:  media:prev
     knob3.right: media:next
 ```
 
-Handlinger: `media:` (transport og volum), `key:`, `app:`, `url:`, `shell:`.
-Filen lastes på nytt når du lagrer. Se [docs/DAEMON.md](docs/DAEMON.md).
+Se [docs/DAEMON.md](docs/DAEMON.md) for hvordan det virker.
 
-Dette løser også play/pause/neste/forrige, som padden ikke får til på egen hånd —
-daemonen sender dem gjennom macOS' egne media-API-er.
+## Uten daemon
+
+Vil du heller ha faste bindinger lagret i padden — uten noe kjørende programvare og
+uten Tilgjengelighet-tilgang — bruker du CLI-en. Da mister du app-avhengighet og
+mediatransport, men volum, taster og mus virker:
+
+```bash
+.venv/bin/python macroctl.py flash config.example.yaml
+.venv/bin/python macroctl.py list-keys
+```
+
+Syntaks: `cmd+c`, `cmd+shift+4`, `h,e,i` (sekvens), `c@100` (forsinkelse),
+`volumeup`/`volumedown`/`mute`, `mouse:left`.
 
 ## Status
 
