@@ -1,0 +1,72 @@
+# Profiler for daemonen — hva hver tast og knott gjør, per app.
+#
+# Kopier til profiles.yaml og rediger. Daemonen laster filen på nytt automatisk
+# når du lagrer; du trenger ikke starte den om igjen.
+#
+# Mål:      key5 … key16     (tastene, se README-illustrasjonen)
+#           knob1.left / knob1.press / knob1.right   (og knob2–4)
+#
+# Handlinger:
+#   media:playpause  media:next  media:prev  media:mute
+#   media:volumeup   media:volumedown
+#   key:cmd+shift+4  — send en tastekombinasjon
+#   app:Spotify      — aktiver eller start en app
+#   url:https://…    — åpne en URL
+#   shell:…          — kjør en kommando
+#   none             — svelg signalet, gjør ingenting
+
+default:
+  # Knott 4 (stor) — volum, slik du ville ha det
+  knob4.left:   media:volumedown
+  knob4.press:  media:mute
+  knob4.right:  media:volumeup
+
+  # Knott 3 (medium) — mediatransport. Dette er funksjonene padden ikke klarer
+  # på egen hånd; daemonen sender dem via macOS' egne media-API-er.
+  knob3.left:   media:prev
+  knob3.press:  media:playpause
+  knob3.right:  media:next
+
+  # Knott 2 (liten) — bla i tekst
+  knob2.left:   key:up
+  knob2.press:  key:enter
+  knob2.right:  key:down
+
+  # Knott 1 (liten) — zoom
+  knob1.left:   key:cmd+minus
+  knob1.press:  key:cmd+0
+  knob1.right:  key:cmd+shift+equal
+
+  # Tastene
+  key5:  key:cmd+c
+  key6:  key:cmd+v
+  key7:  key:cmd+x
+  key8:  key:cmd+z
+  key9:  key:cmd+shift+z
+  key10: key:cmd+a
+  key11: key:cmd+shift+4
+  key12: app:Finder
+  key13: key:cmd+w
+  key14: shell:open -a Spotify
+  key15: url:https://github.com/GaimsDevSoftware/macropad-mac
+  key16: key:cmd+space
+
+# App-avhengige overstyringer. Nøkkelen matcher mot bundle-ID-en til appen som
+# er i front (delstreng, ikke versalfølsom). Alt du ikke overstyrer faller
+# tilbake til «default».
+apps:
+  com.spotify.client:
+    knob3.left:  media:prev
+    knob3.right: media:next
+    key5:        key:cmd+shift+left     # hopp bakover
+    key7:        key:cmd+shift+right    # hopp forover
+
+  com.apple.finder:
+    key12: key:cmd+shift+n              # ny mappe
+    key13: key:cmd+delete               # legg i papirkurven
+
+  com.microsoft.VSCode:
+    key5:  key:cmd+shift+p              # kommandopalett
+    key6:  key:ctrl+grave               # terminal
+    knob1.left:  key:cmd+minus
+    knob1.right: key:cmd+shift+equal

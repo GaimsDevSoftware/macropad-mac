@@ -51,15 +51,45 @@ Klikk en tast eller knott, skriv inn bindingen, trykk **Skriv til tastatur**.
 Modifikatorer: `cmd` `shift` `alt` `ctrl`, samt `rshift`, `ralt` osv. for høyre side.
 Hver knott gir tre uavhengige bindinger: **vri venstre · trykk · vri høyre**.
 
+## App-avhengige taster
+
+Vil du at samme knott skal spole i Spotify og zoome i VS Code — eller ha play/pause i
+det hele tatt — kjører du daemonen. Padden flashes med 24 usynlige signaler, og
+daemonen oversetter dem etter hvilken app som er i front:
+
+```bash
+.venv/bin/python setup_daemon.py       # flash signalene — én gang
+cp profiles.example.yaml profiles.yaml
+.venv/bin/python daemon.py             # krever Tilgjengelighet-tilgang
+```
+
+```yaml
+default:
+  knob3.press: media:playpause
+  key5:        key:cmd+c
+
+apps:
+  com.spotify.client:
+    knob3.left:  media:prev
+    knob3.right: media:next
+```
+
+Handlinger: `media:` (transport og volum), `key:`, `app:`, `url:`, `shell:`.
+Filen lastes på nytt når du lagrer. Se [docs/DAEMON.md](docs/DAEMON.md).
+
+Dette løser også play/pause/neste/forrige, som padden ikke får til på egen hånd —
+daemonen sender dem gjennom macOS' egne media-API-er.
+
 ## Status
 
 - ✅ Tastebindinger, modifikatorer, sekvenser, forsinkelser
-- ✅ Volum opp/ned/mute
+- ✅ Volum opp/ned/mute direkte fra padden
 - ✅ Museklikk
-- ⚠️ Play/pause/neste/forrige — consumer-side, format ennå ikke funnet
+- ✅ App-avhengige taster og full mediatransport via daemonen
+- ⚠️ Play/pause/neste/forrige *direkte fra padden* — consumer-format ikke funnet
+      (daemonen gjør dette overflødig i praksis)
 - ⬜ LED-styring
 - ⬜ Lag 2 og 3 (protokollen støtter det; ikke testet)
-- ⬜ App-avhengige lag (bakgrunnsprosess)
 
 Se [docs/PROTOCOL.md](docs/PROTOCOL.md) for key-ID-kartet og protokolldetaljene.
 

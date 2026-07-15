@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>no.macropad.daemon</string>
+
+  <!-- Juster stiene om prosjektet ligger et annet sted -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/robert/Projects/macropad-mac/.venv/bin/python</string>
+    <string>/Users/robert/Projects/macropad-mac/daemon.py</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/robert/Projects/macropad-mac</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/macropad-daemon.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/macropad-daemon.log</string>
+</dict>
+</plist>

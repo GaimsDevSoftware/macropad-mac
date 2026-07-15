@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 bindings.json
 .DS_Store
+profiles.yaml
