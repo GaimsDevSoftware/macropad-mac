@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<title>Makropad</title>
+<style>
+  :root{
+    --blue:#0071E3; --blue-d:#0068D6;
+    --ink:#1D1D1F; --g2:#3A3A3C; --g5:#86868B; --g6:#AEAEB2;
+    --hair:#E8E8EC; --wash:#FAFAFB;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;
+    --mono:"SF Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:var(--sans); color:var(--ink);
+    background:linear-gradient(#F7F7F9,#EFEFF2); min-height:100vh;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .win{
+    width:min(1220px,100%); background:#fff; border:1px solid #E2E2E6;
+    border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,.10),0 2px 8px rgba(0,0,0,.04);
+    overflow:hidden; display:flex; flex-direction:column;
+  }
+  .title{
+    height:48px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+    padding:0 16px; border-bottom:1px solid var(--hair);
+  }
+  .lights{display:flex;gap:8px}
+  .lights i{width:12px;height:12px;border-radius:50%;display:block}
+  .lights i:nth-child(1){background:#FF5F57}
+  .lights i:nth-child(2){background:#FEBC2E}
+  .lights i:nth-child(3){background:#28C840}
+  .title h1{font-size:14px;font-weight:600}
+  .dev-id{font-family:var(--mono);font-size:10px;color:#C7C7CC;letter-spacing:1.5px;text-align:right}
+  .dev-id .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#D2D2D7;margin-right:6px}
+  .dev-id.on .dot{background:#28C840}
+  .body{display:grid;grid-template-columns:490px 1fr;min-height:700px}
+  .pane-l{background:var(--wash);border-right:1px solid var(--hair);padding:26px 24px 20px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .pane-r{padding:34px 36px;display:flex;flex-direction:column}
+  svg.dev{width:100%;max-width:430px;height:auto;display:block}
+  .board-id{font-family:var(--mono);font-size:9px;color:#C0C0C5;letter-spacing:2px;margin-top:10px}
+
+  /* SVG interaktivitet */
+  .hit{cursor:pointer}
+  .keyface{fill:url(#keyface);stroke:#C6C6CB;stroke-width:2;transition:.12s}
+  .hit:hover .keyface{stroke:#9C9CA3}
+  .hit.sel .keyface{fill:#F0F7FF;stroke:var(--blue);stroke-width:4}
+  .hit.set .keyface{fill:#FCFCFD}
+  .knobface{transition:.12s}
+  .hit:hover .knobrim{stroke:#8E8E93}
+  .hit.sel .knobrim{stroke:var(--blue);stroke-width:5}
+  .klab{font-family:var(--mono);font-size:15px;fill:#fff;text-anchor:middle;pointer-events:none;font-weight:600}
+  .kbadge{fill:#8E8E93;pointer-events:none;transition:.12s}
+  .hit.sel .kbadge{fill:var(--blue)}
+  .hit.set .kbadge{fill:#5A5A5F}
+  .bind{font-family:var(--sans);font-size:19px;fill:var(--g2);text-anchor:middle;pointer-events:none}
+  .hit.sel .bind{fill:var(--blue)}
+  .bind.empty{fill:#D2D2D7}
+  .dotmark{fill:var(--blue);pointer-events:none}
+
+  /* inspektør */
+  .eyebrow{font-size:10px;color:var(--g5);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:14px}
+  .display{font-size:42px;font-weight:200;letter-spacing:-1px;min-height:52px;line-height:1.05}
+  .display.empty{color:#D2D2D7}
+  .sub{font-size:12px;color:var(--g6);margin-top:10px;min-height:16px}
+  .rule{height:1px;background:var(--hair);margin:22px 0}
+  .lbl{font-size:10px;color:var(--g5);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:10px}
+  .seg{display:flex;background:#F1F1F4;border-radius:11px;padding:3px;gap:3px;margin-bottom:20px}
+  .seg button{flex:1;font-family:var(--sans);font-size:12px;padding:8px 4px;border:none;border-radius:9px;
+    background:transparent;color:var(--g5);cursor:pointer;transition:.12s;position:relative}
+  .seg button .badge{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--blue);
+    margin-left:5px;vertical-align:middle;opacity:0}
+  .seg button.has .badge{opacity:1}
+  .seg button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.10)}
+  input[type=text]{width:100%;font-family:var(--mono);font-size:14px;padding:12px 14px;border:1px solid #D6D6DA;
+    border-radius:10px;background:#fff;color:var(--ink);outline:none;transition:.12s}
+  input[type=text]:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,113,227,.14)}
+  input[type=text].bad{border-color:#FF3B30;box-shadow:0 0 0 3px rgba(255,59,48,.12)}
+  input:disabled{background:#FAFAFB;color:#C7C7CC}
+  .hint{font-size:11px;color:var(--g6);margin-top:8px;min-height:15px}
+  .hint.bad{color:#FF3B30}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:11px;padding:6px 11px;border-radius:14px;border:1px solid #E2E2E6;background:#fff;
+    color:var(--g2);cursor:pointer;transition:.12s;font-family:var(--mono)}
+  .chip:hover{border-color:var(--blue);color:var(--blue)}
+  .spacer{flex:1}
+  .foot{display:flex;align-items:center;gap:12px;padding-top:22px;border-top:1px solid var(--hair);margin-top:22px}
+  .count{font-family:var(--mono);font-size:10px;color:#C7C7CC;letter-spacing:1.5px;flex:1}
+  button.btn{font-family:var(--sans);font-size:13px;padding:10px 20px;border-radius:10px;cursor:pointer;
+    border:1px solid #D6D6DA;background:#fff;color:var(--g2);transition:.12s}
+  button.btn:hover{border-color:var(--g6)}
+  button.pri{background:linear-gradient(var(--blue),var(--blue-d));border:none;color:#fff;font-weight:600;
+    box-shadow:0 3px 10px rgba(0,113,227,.3)}
+  button.pri:hover{filter:brightness(1.06)}
+  button.pri:disabled{opacity:.45;cursor:default;filter:none}
+  .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(12px);
+    background:rgba(29,29,31,.94);color:#fff;font-size:13px;padding:11px 20px;border-radius:11px;
+    opacity:0;pointer-events:none;transition:.22s;backdrop-filter:blur(8px)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{background:rgba(200,30,25,.95)}
+</style>
+</head>
+<body>
+<div class="win">
+  <div class="title">
+    <div class="lights"><i></i><i></i><i></i></div>
+    <h1>Makropad</h1>
+    <div class="dev-id" id="devid"><span class="dot"></span>514C:8850</div>
+  </div>
+  <div class="body">
+    <div class="pane-l">
+      <svg class="dev" id="dev" viewBox="0 0 1000 1320" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="alu" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#EFEFF1"/><stop offset="1" stop-color="#DEDEE2"/>
+          </linearGradient>
+          <linearGradient id="keyface" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#FEFEFE"/><stop offset="1" stop-color="#F2F2F4"/>
+          </linearGradient>
+          <radialGradient id="knobface" cx="0.4" cy="0.34" r="0.85">
+            <stop offset="0" stop-color="#FBFBFC"/><stop offset="1" stop-color="#D8D8DD"/>
+          </radialGradient>
+          <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#1D1D1F" flood-opacity="0.13"/>
+          </filter>
+        </defs>
+        <!-- kropp: rektangel + sirkulær utbulning for stor knott -->
+        <g filter="url(#soft)">
+          <path d="M 160 235 L 625 235 L 625 277.7 A 140 140 0 1 1 625 428.3 L 625 1215
+                   Q 625 1245 595 1245 L 160 1245 Q 130 1245 130 1215 L 130 265 Q 130 235 160 235 Z"
+                fill="url(#alu)"/>
+        </g>
+        <path d="M 160 235 L 625 235 L 625 277.7 A 140 140 0 1 1 625 428.3 L 625 1215
+                 Q 625 1245 595 1245 L 160 1245 Q 130 1245 130 1215 L 130 265 Q 130 235 160 235 Z"
+              fill="none" stroke="#CBCBD0" stroke-width="2.5"/>
+        <g id="parts"></g>
+      </svg>
+      <div class="board-id">@XZKJ-12key_4knob</div>
+    </div>
+    <div class="pane-r">
+      <div class="eyebrow" id="eyebrow">Velg en tast eller knott</div>
+      <div class="display empty" id="display">—</div>
+      <div class="sub" id="sub">Klikk på enheten til venstre</div>
+      <div class="rule"></div>
+      <div id="segwrap" style="display:none">
+        <div class="lbl">Handling</div>
+        <div class="seg" id="seg"></div>
+      </div>
+      <div class="lbl">Binding</div>
+      <input type="text" id="spec" placeholder="cmd+c" autocomplete="off" spellcheck="false" disabled>
+      <div class="hint" id="hint">Modifikatorer: cmd, shift, alt, ctrl · Sekvens med komma · Forsinkelse med @ms</div>
+      <div class="lbl" style="margin-top:22px">Hurtigvalg</div>
+      <div class="chips" id="chips"></div>
+      <div class="spacer"></div>
+      <div class="foot">
+        <div class="count" id="count"></div>
+        <button class="btn" id="clear">Fjern binding</button>
+        <button class="btn pri" id="flash">Skriv til tastatur</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// Geometri avlest direkte fra fotoet av enheten
+const KNOBS = {
+  1:{cx:200, cy:268, r:62, size:'liten'},
+  2:{cx:197, cy:475, r:62, size:'liten'},
+  3:{cx:432, cy:353, r:84, size:'medium'},
+  4:{cx:743, cy:353, r:112, size:'stor'},
+};
+const COLS = [195, 350, 522], ROWS = [665, 827, 987, 1152];
+const KEYS = {};
+for(let i=0;i<12;i++) KEYS[i+5] = {x:COLS[i%3], y:ROWS[Math.floor(i/3)]};
+const KW=118, KH=108;
+
+const ACTS = [['left','↺','vri venstre'],['press','●','trykk'],['right','↻','vri høyre']];
+const QUICK = ['cmd+c','cmd+v','cmd+z','cmd+shift+z','volumeup','volumedown','mute','up','down',
+               'left','right','cmd+minus','cmd+shift+equal','f13','mouse:left','enter','esc'];
+
+let state = {layer:1, bindings:{}};
+let sel = null, selAct = 'right';
+
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const el = (t,a={}) => { const e=document.createElementNS(NS,t);
+  for(const k in a) e.setAttribute(k,a[k]); return e; };
+const pretty = s => s ? s.replace(/\bcmd\b/g,'⌘').replace(/\bshift\b/g,'⇧').replace(/\balt\b/g,'⌥')
+  .replace(/\bctrl\b/g,'⌃').replace(/\bvolumeup\b/g,'Vol +').replace(/\bvolumedown\b/g,'Vol −')
+  .replace(/\bmute\b/g,'Mute').replace(/\+/g,' ').replace(/,/g,' , ') : '';
+const short = s => { const p = pretty(s); return p.length > 9 ? p.slice(0,8)+'…' : p; };
+const target = () => !sel ? null : (sel.startsWith('knob') ? `${sel}.${selAct}` : sel);
+
+function toast(msg, err){
+  const t=$('toast'); t.textContent=msg; t.className='toast show'+(err?' err':'');
+  setTimeout(()=>t.className='toast',2400);
+}
+
+function build(){
+  const g = $('parts');
+  for(const n in KNOBS){
+    const k = KNOBS[n];
+    const grp = el('g',{class:'hit','data-k':'knob'+n}); grp.id='p-knob'+n;
+    grp.appendChild(el('circle',{cx:k.cx, cy:k.cy+4, r:k.r, fill:'#A9A9AF', opacity:.45}));
+    grp.appendChild(el('circle',{class:'knobrim', cx:k.cx, cy:k.cy, r:k.r,
+      fill:'url(#knobface)', stroke:'#B4B4BA', 'stroke-width':3.5}));
+    grp.appendChild(el('circle',{cx:k.cx - k.r*.5, cy:k.cy - k.r*.5, r:5, fill:'#9C9CA3'}));
+    const bw = 30, by = k.cy + k.r - 42;
+    grp.appendChild(el('circle',{class:'kbadge', cx:k.cx, cy:k.cy, r:17}));
+    const t = el('text',{class:'klab', x:k.cx, y:k.cy+5.5}); t.textContent = n;
+    grp.appendChild(t);
+    grp.onclick = ()=>select('knob'+n);
+    g.appendChild(grp);
+  }
+  for(const n in KEYS){
+    const k = KEYS[n];
+    const grp = el('g',{class:'hit','data-k':'key'+n}); grp.id='p-key'+n;
+    grp.appendChild(el('rect',{x:k.x-KW/2, y:k.y-KH/2+5, width:KW, height:KH, rx:14, fill:'#BDBDC3'}));
+    grp.appendChild(el('rect',{class:'keyface', x:k.x-KW/2, y:k.y-KH/2, width:KW, height:KH, rx:14}));
+    const b = el('text',{class:'bind empty', x:k.x, y:k.y+4}); b.textContent='—'; b.id='b-key'+n;
+    grp.appendChild(b);
+    const num = el('text',{x:k.x, y:k.y+KH/2-10, 'text-anchor':'middle',
+      'font-family':'ui-monospace,monospace', 'font-size':13, fill:'#C0C0C5'});
+    num.textContent = n; num.style.pointerEvents='none';
+    grp.appendChild(num);
+    grp.onclick = ()=>select('key'+n);
+    g.appendChild(grp);
+  }
+  const s = $('seg'); s.innerHTML='';
+  ACTS.forEach(([a,sym,name])=>{
+    const b=document.createElement('button'); b.dataset.a=a;
+    b.innerHTML = `${sym} ${name}<span class="badge"></span>`;
+    b.onclick = ()=>{ selAct=a; syncInput(); render(); };
+    s.appendChild(b);
+  });
+  const ch=$('chips'); ch.innerHTML='';
+  QUICK.forEach(q=>{ const c=document.createElement('button'); c.className='chip'; c.textContent=q;
+    c.onclick=()=>{ if(!sel) return toast('Velg en tast eller knott først', true);
+      $('spec').value=q; apply(q); }; ch.appendChild(c); });
+}
+
+function render(){
+  // enhet
+  for(const n in KNOBS){
+    const g = $('p-knob'+n);
+    const any = ACTS.some(([a])=>state.bindings[`knob${n}.${a}`]);
+    g.setAttribute('class','hit'+(any?' set':'')+(sel==='knob'+n?' sel':''));
+  }
+  for(const n in KEYS){
+    const g = $('p-key'+n), v = state.bindings['key'+n];
+    g.setAttribute('class','hit'+(v?' set':'')+(sel==='key'+n?' sel':''));
+    const b = $('b-key'+n);
+    b.textContent = v ? short(v) : '—';
+    b.setAttribute('class','bind'+(v?'':' empty'));
+  }
+  // segmentert kontroll
+  const isKnob = sel && sel.startsWith('knob');
+  $('segwrap').style.display = isKnob ? 'block' : 'none';
+  if(isKnob) [...$('seg').children].forEach(b=>{
+    const has = !!state.bindings[`${sel}.${b.dataset.a}`];
+    b.className = (b.dataset.a===selAct?'on':'') + (has?' has':'');
+  });
+  // inspektør
+  const t = target(), v = t ? (state.bindings[t]||'') : '';
+  $('display').textContent = v ? pretty(v) : '—';
+  $('display').className = 'display'+(v?'':' empty');
+  if(!sel){
+    $('eyebrow').textContent = 'Velg en tast eller knott';
+    $('sub').textContent = 'Klikk på enheten til venstre';
+  } else if(isKnob){
+    const n = sel.slice(4), a = ACTS.find(x=>x[0]===selAct);
+    $('eyebrow').textContent = `Knott ${n} · ${KNOBS[n].size} · ${a[2]}`;
+    $('sub').textContent = v ? `Sendes som ${v}` : 'Ingen binding';
+  } else {
+    $('eyebrow').textContent = `Tast ${sel.slice(3)}`;
+    $('sub').textContent = v ? `Sendes som ${v}` : 'Ingen binding';
+  }
+  const n = Object.values(state.bindings).filter(Boolean).length;
+  $('count').textContent = n ? `${n} BINDING${n>1?'ER':''}` : 'INGEN BINDINGER';
+  $('flash').disabled = n===0;
+}
+
+function syncInput(){
+  const t = target(), inp = $('spec');
+  inp.disabled = !t;
+  inp.value = t ? (state.bindings[t]||'') : '';
+  inp.className = '';
+  $('hint').className='hint';
+  $('hint').textContent='Modifikatorer: cmd, shift, alt, ctrl · Sekvens med komma · Forsinkelse med @ms';
+}
+
+function select(k){ sel = k; syncInput(); render(); $('spec').focus(); $('spec').select(); }
+
+async function apply(spec){
+  const t = target(); if(!t) return;
+  spec = spec.trim();
+  const inp=$('spec'), hint=$('hint');
+  if(!spec){ delete state.bindings[t]; inp.className='';
+    hint.className='hint'; hint.textContent='Ingen binding'; render(); save(); return; }
+  const r = await (await fetch('/api/validate',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({spec})})).json();
+  if(r.ok){ state.bindings[t]=spec; inp.className='';
+    hint.className='hint'; hint.textContent='Gyldig'; render(); save(); }
+  else { inp.className='bad'; hint.className='hint bad'; hint.textContent=r.error; }
+}
+
+const save = () => fetch('/api/save',{method:'POST',
+  headers:{'Content-Type':'application/json'},body:JSON.stringify(state)});
+
+$('spec').addEventListener('input', e=>apply(e.target.value));
+$('clear').onclick = ()=>{ if(!target()) return toast('Velg en tast eller knott først', true);
+  $('spec').value=''; apply(''); };
+$('flash').onclick = async ()=>{
+  const b=$('flash'); b.disabled=true; b.textContent='Skriver…';
+  const r = await (await fetch('/api/flash',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(state)})).json();
+  b.textContent='Skriv til tastatur'; b.disabled=false;
+  r.ok ? toast(`${r.count} bindinger skrevet til tastaturet`) : toast(r.error, true);
+};
+
+(async()=>{
+  build();
+  const st = await (await fetch('/api/state')).json();
+  state = {layer:st.layer||1, bindings:st.bindings||{}};
+  const d = await (await fetch('/api/device')).json();
+  $('devid').className = 'dev-id'+(d.connected?' on':'');
+  render();
+})();
+</script>
+</body>
+</html>
