@@ -27,9 +27,14 @@ PROFILES = os.path.join(HERE, "profiles.yaml")
 VK_F = {105: "f13", 107: "f14", 113: "f15", 106: "f16",
         64: "f17", 79: "f18", 80: "f19", 90: "f20"}
 
-HYPER = (Quartz.kCGEventFlagMaskControl | Quartz.kCGEventFlagMaskShift |
-         Quartz.kCGEventFlagMaskAlternate)
+CTRL = Quartz.kCGEventFlagMaskControl
+SHIFT = Quartz.kCGEventFlagMaskShift
+ALT = Quartz.kCGEventFlagMaskAlternate
 CMD = Quartz.kCGEventFlagMaskCommand
+ALL = CTRL | SHIFT | ALT | CMD
+
+# Må speile TIERS i signals.py. Rekkefølgen betyr noe: mest spesifikke først.
+TIERS = [(CTRL | ALT, "ctrl+alt+"), (CTRL | SHIFT, "ctrl+shift+"), (0, "")]
 
 
 def signal_name(keycode, flags):
@@ -37,12 +42,10 @@ def signal_name(keycode, flags):
     name = VK_F.get(keycode)
     if not name:
         return None
-    if (flags & (HYPER | CMD)) == (HYPER | CMD):
-        return "cmd+ctrl+shift+alt+" + name
-    if (flags & HYPER) == HYPER:
-        return "ctrl+shift+alt+" + name
-    if not (flags & (HYPER | CMD)):
-        return name
+    held = flags & ALL
+    for mask, prefix in TIERS:
+        if held == mask:          # eksakt treff — ingen ekstra modifikatorer
+            return prefix + name
     return None
 
 
@@ -113,15 +116,18 @@ def make_callback(d: Daemon):
 
 
 TAP = None
+CALLBACK = None   # må holdes i live: PyObjC samler den ellers som søppel,
+                  # og tapen slutter stille å levere hendelser
 
 
 def main():
     d = Daemon()
-    global TAP
+    global TAP, CALLBACK
+    CALLBACK = make_callback(d)
     mask = Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown)
     TAP = Quartz.CGEventTapCreate(
         Quartz.kCGSessionEventTap, Quartz.kCGHeadInsertEventTap,
-        Quartz.kCGEventTapOptionDefault, mask, make_callback(d), None)
+        Quartz.kCGEventTapOptionDefault, mask, CALLBACK, None)
     if not TAP:
         print("Kunne ikke opprette event tap.\n\n"
               "Gi Tilgjengelighet-tilgang til programmet du kjører dette fra:\n"
