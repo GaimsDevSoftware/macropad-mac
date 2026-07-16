@@ -16,6 +16,8 @@ import subprocess
 import Quartz
 from AppKit import NSWorkspace
 
+import keys
+
 # NX_KEYTYPE-koder for systemets media-taster
 NX = {
     "playpause": 16, "next": 17, "prev": 18, "fast": 19, "rewind": 20,
@@ -23,23 +25,8 @@ NX = {
     "brightnessup": 2, "brightnessdown": 3,
 }
 
-# Virtuelle tastekoder for tastatur-sending
-VK = {
-    **{c: k for c, k in zip("asdfhgzxcv", (0, 1, 2, 3, 4, 5, 6, 7, 8, 9))},
-    "b": 11, "q": 12, "w": 13, "e": 14, "r": 15, "y": 16, "t": 17,
-    "1": 18, "2": 19, "3": 20, "4": 21, "6": 22, "5": 23, "9": 25, "7": 26,
-    "8": 28, "0": 29, "o": 31, "u": 32, "i": 34, "p": 35, "l": 37, "j": 38,
-    "k": 40, "n": 45, "m": 46,
-    "enter": 36, "tab": 48, "space": 49, "backspace": 51, "esc": 53,
-    "left": 123, "right": 124, "down": 125, "up": 126,
-    "home": 115, "end": 119, "pageup": 116, "pagedown": 121, "delete": 117,
-    # tegntaster
-    "minus": 27, "equal": 24, "grave": 50, "lbracket": 33, "rbracket": 30,
-    "semicolon": 41, "quote": 39, "comma": 43, "dot": 47, "period": 47,
-    "slash": 44, "backslash": 42,
-    **{f"f{i}": c for i, c in zip(range(1, 13), (122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111))},
-    **{f"f{i}": c for i, c in zip(range(13, 21), (105, 107, 113, 106, 64, 79, 80, 90))},
-}
+# Virtuelle tastekoder — felles kart, se keys.py
+VK = {**keys.VK, "period": keys.VK["dot"]}   # 'period' er et vanlig alias
 
 MODMASK = {
     "cmd": Quartz.kCGEventFlagMaskCommand,

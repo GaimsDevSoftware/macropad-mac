@@ -12,12 +12,14 @@ Krever:  Systeminnstillinger → Personvern og sikkerhet → Tilgjengelighet
 """
 import os
 import sys
+import time
 
 import yaml
 import Quartz
 from AppKit import NSWorkspace
 
 import actions
+import keys
 import paths
 import signals
 
@@ -98,6 +100,37 @@ class Daemon:
             print(f"  ! feil: {e}")
 
 
+MASKS = {"cmd": Quartz.kCGEventFlagMaskCommand,
+         "shift": Quartz.kCGEventFlagMaskShift,
+         "alt": Quartz.kCGEventFlagMaskAlternate,
+         "ctrl": Quartz.kCGEventFlagMaskControl}
+
+# Opptaksmodus: grensesnittet ber om «trykk tastene du vil ha», og vi fanger
+# neste ekte tastetrykk. Fordelen med å gjøre det her framfor i nettleseren er
+# at tapen ser alt — også cmd+Q og cmd+W, som nettleseren ville spist selv.
+# Alt svelges mens opptaket står på, så ingenting lekker ut i appen bak.
+CAPTURE = {"on": False, "result": None}
+
+# Siste padde-trykk — grensesnittet lyser opp tasten du nettopp rørte.
+LAST = {"target": None, "at": 0.0}
+
+
+def capture_start():
+    CAPTURE.update(on=True, result=None)
+
+
+def capture_stop():
+    CAPTURE["on"] = False
+
+
+def capture_result():
+    return CAPTURE["result"]
+
+
+def last_press():
+    return {"target": LAST["target"], "age": time.time() - LAST["at"]}
+
+
 def make_callback(d: Daemon):
     def cb(proxy, etype, event, refcon):
         if etype in (Quartz.kCGEventTapDisabledByTimeout,
@@ -106,10 +139,18 @@ def make_callback(d: Daemon):
             return event
         keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
         flags = Quartz.CGEventGetFlags(event)
+
+        if CAPTURE["on"]:
+            spec = keys.from_event(keycode, flags, MASKS)
+            if spec:                # rene modifikatorer gir None — vent videre
+                CAPTURE.update(on=False, result=spec)
+            return None             # svelg alt: opptaket skal ikke skrive noe
+
         sig = signal_name(keycode, flags)
         target = signals.BY_SIGNAL.get(sig) if sig else None
         if not target:
             return event  # ikke vårt signal — la den passere
+        LAST.update(target=target, at=time.time())
         d.maybe_reload()
         d.handle(target)
         return None  # svelg signalet

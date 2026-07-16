@@ -18,7 +18,9 @@ import webbrowser
 import yaml
 
 import actions
+import daemon as dmn
 import device
+import keys
 import paths
 import signals
 import xzkj
@@ -108,9 +110,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "profiles": load_profiles(),
                 "targets": signals.TARGETS,
                 "media": sorted(actions.NX),
-                "keys": sorted(actions.VK),
+                "keys": sorted(keys.VK),
+                "categories": [{"id": i, "en": en, "no": no, "keys": ks}
+                               for i, en, no, ks in keys.CATEGORIES],
+                "symbols": keys.SYMBOL,
+                "mods": list(keys.MODS),
                 "saved": os.path.exists(PROFILES),
             })
+        elif self.path == "/api/capture/poll":
+            r = dmn.capture_result()
+            self._json({"done": bool(r), "spec": r})
+        elif self.path == "/api/lastpress":
+            self._json(dmn.last_press())
         elif self.path == "/api/status":
             try:
                 h = xzkj.open_vendor_interface(); h.close()
@@ -146,6 +157,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json({"ok": True})
             except Exception as e:
                 self._json({"ok": False, "error": str(e)})
+        elif self.path == "/api/capture/start":
+            if not dmn.TAP:
+                self._json({"ok": False, "error": "tap"})
+            else:
+                dmn.capture_start()
+                self._json({"ok": True})
+        elif self.path == "/api/capture/cancel":
+            dmn.capture_stop()
+            self._json({"ok": True})
         else:
             self.send_error(404)
 

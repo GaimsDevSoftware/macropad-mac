@@ -52,6 +52,7 @@ MB_ARG=()
   --add-data "ui.html:." \
   --hidden-import paths \
   --hidden-import access \
+  --hidden-import keys \
   --add-data "profiles.example.yaml:." \
   --osx-bundle-identifier no.macropad.app \
   --hidden-import hid \
@@ -70,9 +71,22 @@ echo "▸ Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :NSHumanReadableCopyright string 'MIT'" "$PLIST" 2>/dev/null || true
 
-echo "▸ Signerer lokalt (ad-hoc)"
-codesign --force --deep --sign - "dist/$APP.app" 2>/dev/null || \
-  echo "  (codesign hoppet over)"
+echo "▸ Signerer"
+# Et ekte Developer ID gjor at macOS kjenner appen igjen pa tvers av bygginger:
+# Tilgjengelighet knyttes til bundle-ID + team-ID, ikke til en hash som endrer
+# seg hver gang. Uten det (ad-hoc) ma du huke av pa nytt ved hver eneste bygging.
+IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
+  | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+if [ -z "$IDENTITY" ]; then
+  IDENTITY="-"
+  echo "  Fant ingen Developer ID — signerer ad-hoc."
+  echo "  Merk: da ma Tilgjengelighet hukes av pa nytt etter hver bygging."
+else
+  echo "  $IDENTITY"
+fi
+codesign --force --deep --sign "$IDENTITY" --timestamp=none "dist/$APP.app" 2>&1 \
+  | grep -v "replacing existing signature" || true
+codesign --verify --strict "dist/$APP.app" && echo "  signatur OK"
 
 echo "▸ DMG"
 STAGE=$(mktemp -d)
