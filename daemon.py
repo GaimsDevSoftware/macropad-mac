@@ -18,10 +18,10 @@ import Quartz
 from AppKit import NSWorkspace
 
 import actions
+import paths
 import signals
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-PROFILES = os.path.join(HERE, "profiles.yaml")
+PROFILES = paths.PROFILES
 
 # Virtuelle tastekoder for F13–F20 (de eneste macOS definerer)
 VK_F = {105: "f13", 107: "f14", 113: "f15", 106: "f16",
@@ -57,6 +57,7 @@ class Daemon:
 
     def load(self):
         try:
+            paths.ensure_profiles()      # første kjøring: kopier eksempelet
             with open(PROFILES) as f:
                 self.profiles = yaml.safe_load(f) or {}
             self.mtime = os.path.getmtime(PROFILES)
@@ -118,25 +119,62 @@ def make_callback(d: Daemon):
 TAP = None
 CALLBACK = None   # må holdes i live: PyObjC samler den ellers som søppel,
                   # og tapen slutter stille å levere hendelser
+SOURCE = None
+
+NO_ACCESS = ("Kunne ikke opprette event tap — mangler Tilgjengelighet-tilgang.\n"
+             "Systeminnstillinger → Personvern og sikkerhet → Tilgjengelighet →\n"
+             "legg til programmet, huk av, og start det på nytt.")
 
 
-def main():
-    d = Daemon()
-    global TAP, CALLBACK
+def install_tap(d: Daemon):
+    """Opprett tapen og heng den på run-loopen som allerede kjører.
+
+    Returnerer True om det gikk. Kaller ikke run-loopen selv — det gjør enten
+    main() her, eller NSApplication når vi kjører inne i menylinje-appen.
+    """
+    global TAP, CALLBACK, SOURCE
+    if TAP:
+        return True
     CALLBACK = make_callback(d)
     mask = Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown)
     TAP = Quartz.CGEventTapCreate(
         Quartz.kCGSessionEventTap, Quartz.kCGHeadInsertEventTap,
         Quartz.kCGEventTapOptionDefault, mask, CALLBACK, None)
     if not TAP:
-        print("Kunne ikke opprette event tap.\n\n"
-              "Gi Tilgjengelighet-tilgang til programmet du kjører dette fra:\n"
-              "  Systeminnstillinger → Personvern og sikkerhet → Tilgjengelighet\n"
-              "Legg til Terminal (eller iTerm/VS Code), huk av, og start på nytt.")
-        sys.exit(1)
-    src = Quartz.CFMachPortCreateRunLoopSource(None, TAP, 0)
-    Quartz.CFRunLoopAddSource(Quartz.CFRunLoopGetCurrent(), src, Quartz.kCFRunLoopCommonModes)
+        CALLBACK = None
+        return False
+    SOURCE = Quartz.CFMachPortCreateRunLoopSource(None, TAP, 0)
+    Quartz.CFRunLoopAddSource(Quartz.CFRunLoopGetCurrent(), SOURCE,
+                              Quartz.kCFRunLoopCommonModes)
     Quartz.CGEventTapEnable(TAP, True)
+    return True
+
+
+def can_tap() -> bool:
+    """Har prosessen Tilgjengelighet? Prøver å opprette en tap og kaster den."""
+    if TAP:
+        return True
+    t = Quartz.CGEventTapCreate(
+        Quartz.kCGSessionEventTap, Quartz.kCGHeadInsertEventTap,
+        Quartz.kCGEventTapOptionListenOnly,
+        Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown), lambda *a: None, None)
+    return bool(t)
+
+
+def set_enabled(on: bool):
+    if TAP:
+        Quartz.CGEventTapEnable(TAP, bool(on))
+
+
+def is_enabled() -> bool:
+    return bool(TAP) and Quartz.CGEventTapIsEnabled(TAP)
+
+
+def main():
+    d = Daemon()
+    if not install_tap(d):
+        print(NO_ACCESS)
+        sys.exit(1)
     print("Daemon kjører. Trykk på padden. Ctrl+C for å avslutte.\n")
     try:
         Quartz.CFRunLoopRun()

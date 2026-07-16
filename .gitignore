@@ -4,3 +4,7 @@ __pycache__/
 bindings.json
 .DS_Store
 profiles.yaml
+build/
+dist/
+*.spec
+build_assets/

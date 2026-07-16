@@ -19,17 +19,17 @@ import yaml
 
 import actions
 import device
+import paths
 import signals
 import xzkj
 
 PORT = 8777
-HERE = os.path.dirname(os.path.abspath(__file__))
-PROFILES = os.path.join(HERE, "profiles.yaml")
-EXAMPLE = os.path.join(HERE, "profiles.example.yaml")
+PROFILES = paths.PROFILES
+EXAMPLE = paths.EXAMPLE
 
 
 def load_profiles():
-    path = PROFILES if os.path.exists(PROFILES) else EXAMPLE
+    path = paths.ensure_profiles()
     with open(path) as f:
         p = yaml.safe_load(f) or {}
     p.setdefault("default", {})
@@ -96,7 +96,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path in ("/", "/index.html"):
-            with open(os.path.join(HERE, "ui.html"), "rb") as f:
+            with open(paths.resource("ui.html"), "rb") as f:
                 body = f.read()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
