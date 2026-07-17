@@ -53,6 +53,7 @@ MB_ARG=()
   --hidden-import paths \
   --hidden-import access \
   --hidden-import keys \
+  --hidden-import store \
   --add-data "profiles.example.yaml:." \
   --osx-bundle-identifier no.macropad.app \
   --hidden-import hid \

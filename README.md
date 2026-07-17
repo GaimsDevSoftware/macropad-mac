@@ -49,11 +49,22 @@ umiddelbart — daemonen laster profilen på nytt når den lagres.
 
 Hver knott gir tre uavhengige handlinger: **vri venstre · trykk · vri høyre**.
 
+### Profiler
+
+Tre profiler — **Profil 1 / 2 / 3** — hver med sitt eget komplette oppsett (standard +
+app-overstyringer). Bytt aktiv profil øverst i grensesnittet eller fra menylinja
+(**Profil**-menyen). Daemonen dispatcher fra den aktive; bytte får virkning umiddelbart.
+
+Profilene lever i software, ikke på padden. Det er med vilje: på denne enheten kan ikke
+verten lese hvilket fysisk lag padden står på (firmware sender ingen beskjed), og
+signal-modellen har ikke plass til tre lag med unike, kollisjonsfrie signaler. Software-
+profiler gir samme resultat uten den usikkerheten.
+
 ### Per app
 
 Legg til en app med **+** i grensesnittet, så overstyrer du bare tastene du vil ha
 annerledes der — resten arves fra standardprofilen (vist nedtonet i tegningen).
-Samme knott kan spole i Spotify og zoome i VS Code.
+Samme knott kan spole i Spotify og zoome i VS Code. App-overstyringer er per profil.
 
 ```yaml
 default:
@@ -86,10 +97,12 @@ Syntaks: `cmd+c`, `cmd+shift+4`, `h,e,i` (sekvens), `c@100` (forsinkelse),
 - ✅ Volum opp/ned/mute direkte fra padden
 - ✅ Museklikk
 - ✅ App-avhengige taster og full mediatransport via daemonen
+- ✅ Tre software-profiler (Profil 1/2/3), byttes i UI-et eller menylinja
 - ⚠️ Play/pause/neste/forrige *direkte fra padden* — consumer-format ikke funnet
       (daemonen gjør dette overflødig i praksis)
 - ⬜ LED-styring
-- ⬜ Lag 2 og 3 (protokollen støtter det; ikke testet)
+- ⬜ Fysiske hardware-lag (protokollen har `layer`-byte, men verten kan ikke lese
+      aktivt lag — software-profiler brukes i stedet)
 
 Se [docs/PROTOCOL.md](docs/PROTOCOL.md) for key-ID-kartet og protokolldetaljene.
 

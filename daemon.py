@@ -14,7 +14,6 @@ import os
 import sys
 import time
 
-import yaml
 import Quartz
 from AppKit import NSWorkspace
 
@@ -22,6 +21,7 @@ import actions
 import keys
 import paths
 import signals
+import store
 
 PROFILES = paths.PROFILES
 
@@ -59,17 +59,16 @@ class Daemon:
 
     def load(self):
         try:
-            paths.ensure_profiles()      # første kjøring: kopier eksempelet
-            with open(PROFILES) as f:
-                self.profiles = yaml.safe_load(f) or {}
+            self.profiles = store.load()      # normalisert; migrerer + lager fila
             self.mtime = os.path.getmtime(PROFILES)
-            n = sum(len(v or {}) for k, v in self.profiles.items() if k != "apps")
-            apps = list((self.profiles.get("apps") or {}).keys())
-            print(f"Profiler lastet: standard + {len(apps)} app-overstyring(er)"
+            active = self.profiles["active"]
+            m = store.active_map(self.profiles)
+            apps = list((m.get("apps") or {}).keys())
+            print(f"Aktiv profil: {active} — standard + {len(apps)} app-overstyring(er)"
                   + (f" ({', '.join(apps)})" if apps else ""))
         except FileNotFoundError:
             print(f"Fant ikke {PROFILES} — lager ingen bindinger.")
-            self.profiles = {}
+            self.profiles = store.normalize({})
 
     def maybe_reload(self):
         try:
@@ -79,11 +78,12 @@ class Daemon:
             pass
 
     def action_for(self, target: str, bundle: str):
-        apps = self.profiles.get("apps") or {}
+        m = store.active_map(self.profiles)   # aktiv profils {default, apps}
+        apps = m.get("apps") or {}
         for pattern, mapping in apps.items():
             if pattern.lower() in bundle.lower() and target in (mapping or {}):
                 return (mapping[target], pattern)
-        default = self.profiles.get("default") or {}
+        default = m.get("default") or {}
         return (default.get(target), None)
 
     def handle(self, target: str):

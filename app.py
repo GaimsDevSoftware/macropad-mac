@@ -15,35 +15,18 @@ import subprocess
 import threading
 import webbrowser
 
-import yaml
-
 import actions
 import daemon as dmn
 import device
 import keys
 import paths
 import signals
+import store
 import xzkj
 
 PORT = 8777
 PROFILES = paths.PROFILES
 EXAMPLE = paths.EXAMPLE
-
-
-def load_profiles():
-    path = paths.ensure_profiles()
-    with open(path) as f:
-        p = yaml.safe_load(f) or {}
-    p.setdefault("default", {})
-    p.setdefault("apps", {})
-    return p
-
-
-def save_profiles(p):
-    p.setdefault("default", {})
-    p.setdefault("apps", {})
-    with open(PROFILES, "w") as f:
-        yaml.safe_dump(p, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
 
 
 def running_apps():
@@ -106,8 +89,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
         elif self.path == "/api/state":
+            doc = store.load()
             self._json({
-                "profiles": load_profiles(),
+                "doc": doc,                       # {active, profiles:{navn:{default,apps}}}
+                "profileNames": store.NAMES,
                 "targets": signals.TARGETS,
                 "media": sorted(actions.NX),
                 "keys": sorted(keys.VK),
@@ -138,7 +123,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length", 0))
         data = json.loads(self.rfile.read(n) or "{}")
         if self.path == "/api/save":
-            save_profiles(data)
+            store.save(data)
             self._json({"ok": True})
         elif self.path == "/api/validate":
             try:

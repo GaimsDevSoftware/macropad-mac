@@ -32,6 +32,15 @@
   .lang{border:none;background:none;font-family:var(--mono);font-size:10px;color:#C7C7CC;
     cursor:pointer;letter-spacing:1px;padding:3px 6px;border-radius:5px}
   .lang:hover{background:#F2F2F4;color:var(--g2)}
+  .profilebar{display:flex;align-items:center;gap:14px;padding:9px 16px;
+    border-bottom:1px solid var(--hair);background:var(--wash)}
+  .pb-lbl{font-family:var(--mono);font-size:10px;color:var(--g5);letter-spacing:1px;
+    text-transform:uppercase}
+  .pseg{display:flex;background:#F1F1F4;border-radius:10px;padding:3px;gap:3px}
+  .pseg button{font-family:var(--sans);font-size:12px;padding:6px 18px;border:none;
+    background:none;border-radius:8px;color:var(--g3);cursor:pointer;transition:.12s}
+  .pseg button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.10)}
+  .pseg button:hover:not(.on){color:var(--g2)}
   .body{display:grid;grid-template-columns:430px 1fr;min-height:760px}
   .pane-l{background:var(--wash);border-right:1px solid var(--hair);padding:20px;
     display:flex;flex-direction:column;align-items:center;justify-content:center}
@@ -181,6 +190,10 @@
       <button class="lang" id="lang">NO</button>
     </div>
   </div>
+  <div class="profilebar">
+    <span class="pb-lbl" id="pb-lbl"></span>
+    <div class="pseg" id="profiles"></div>
+  </div>
   <div class="body">
     <div class="pane-l">
       <svg class="dev" id="dev" viewBox="0 0 1000 1320" xmlns="http://www.w3.org/2000/svg">
@@ -237,6 +250,7 @@ const I18N = {
   en:{pad:"PAD",action:"Action",type:"Type",value:"Value",modifiers:"Modifiers",key:"Key",
     left:"Turn left",press:"Press",right:"Turn right",small:"small",medium:"medium",large:"large",
     knob:"Knob",keyN:"Key",pick:"Select a key or knob",clickDev:"Click the device on the left",
+    profile:"Profile",
     none:"No action",own:"Set",ownFor:"for this profile",inherited:"Inherited from default",
     tMedia:"Media",tKey:"Keyboard",tApp:"App",tUrl:"URL",tShell:"Shell",
     record:"Press keys…",recording:"Press the keys you want — Esc to cancel",
@@ -255,6 +269,7 @@ const I18N = {
   no:{pad:"PADDE",action:"Handling",type:"Type",value:"Verdi",modifiers:"Modifikatorer",key:"Tast",
     left:"Vri venstre",press:"Trykk",right:"Vri høyre",small:"liten",medium:"medium",large:"stor",
     knob:"Knott",keyN:"Tast",pick:"Velg en tast eller knott",clickDev:"Klikk på enheten til venstre",
+    profile:"Profil",
     none:"Ingen handling",own:"Egen",ownFor:"for denne profilen",inherited:"Arvet fra standard",
     tMedia:"Media",tKey:"Tastatur",tApp:"App",tUrl:"URL",tShell:"Skall",
     record:"Trykk taster…",recording:"Trykk tastene du vil ha — Esc for å avbryte",
@@ -290,6 +305,9 @@ const TYPES=[["key","tKey"],["media","tMedia"],["app","tApp"],["url","tUrl"],["s
 const MEDIA=[["playpause","⏯"],["prev","⏮"],["next","⏭"],
              ["volumedown","🔉"],["mute","🔇"],["volumeup","🔊"]];
 
+// DOC = hele fila {active, profiles:{navn:{default,apps}}}. P = den aktive
+// profilens {default,apps} — en referanse inn i DOC, så redigering muterer DOC.
+let DOC={active:"Profil 1",profiles:{}}, PROFILE="Profil 1";
 let P={default:{},apps:{}}, META={}, prof="default", sel=null, selAct="right",
     type="key", armed=false, pollTimer=null;
 
@@ -554,7 +572,25 @@ async function testAction(a){
 }
 function select(k){ sel=k; if(k.startsWith("knob")) selAct="left"; syncEditor(); render(); }
 const save=()=>fetch("/api/save",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify(P)});
+  body:JSON.stringify(DOC)});
+
+// ═══ profiler (Profil 1/2/3) ═════════════════════════════════════════
+function profileBar(){
+  const c=$("profiles"); c.innerHTML="";
+  (META.profileNames||Object.keys(DOC.profiles)).forEach(name=>{
+    const b=document.createElement("button");
+    b.textContent=name; b.className=(PROFILE===name?"on":"");
+    b.onclick=()=>switchProfile(name);
+    c.appendChild(b);
+  });
+}
+function switchProfile(name){
+  if(name===PROFILE||!DOC.profiles[name]) return;
+  PROFILE=name; DOC.active=name; P=DOC.profiles[name];
+  prof="default"; sel=null;           // tilbake til standard-fanen i ny profil
+  save();                             // aktiv profil byttes også for daemonen
+  profileBar(); tabs(); syncEditor(); render();
+}
 
 // ═══ språk ═══════════════════════════════════════════════════════════
 function applyLang(){
@@ -566,6 +602,7 @@ function applyLang(){
   $("clear").textContent=t("clear");
   $("prep").textContent=t("prep");
   $("yaml").textContent=t("yaml");
+  $("pb-lbl").textContent=t("profile");
   $("dlg-t").textContent=t("addApp"); $("dlg-p").textContent=t("addAppP");
   $("dlg-c").textContent=t("cancel"); $("appadd").textContent=t("add");
   const s=$("typeseg"); s.innerHTML="";
@@ -573,7 +610,7 @@ function applyLang(){
     b.textContent=t(k); b.onclick=()=>{type=id; drawEditor();
       [...s.children].forEach(x=>x.className=x.dataset.t===id?"on":"");};
     s.appendChild(b);});
-  tabs(); syncEditor(); render();
+  profileBar(); tabs(); syncEditor(); render();
 }
 $("lang").onclick=()=>{ LANG=LANG==="en"?"no":"en";
   localStorage.setItem("lang",LANG); applyLang(); };
@@ -586,7 +623,7 @@ $("clear").onclick=()=>{const tg=target(); if(!tg)return toast(t("selectFirst"),
 $("yaml").onclick=()=>{
   const w=window.open("","_blank","width=680,height=760");
   w.document.write("<pre style='font:12px ui-monospace;padding:20px;white-space:pre-wrap'>"
-    +JSON.stringify(P,null,2).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))+"</pre>");
+    +JSON.stringify(DOC,null,2).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))+"</pre>");
 };
 $("prep").onclick=async()=>{const b=$("prep"); b.disabled=true;
   const r=await (await fetch("/api/flash",{method:"POST",
@@ -616,7 +653,7 @@ async function livePress(){
 (async()=>{
   build();
   const st=await (await fetch("/api/state")).json();
-  P=st.profiles; META=st;
+  META=st; DOC=st.doc; PROFILE=DOC.active; P=DOC.profiles[PROFILE];
   applyLang(); status();
   setInterval(status,4000);
   setInterval(livePress,220);

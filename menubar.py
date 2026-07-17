@@ -22,6 +22,7 @@ import access
 import app as config_app
 import daemon as dmn
 import paths
+import store
 import xzkj
 
 PORT = 8777
@@ -67,9 +68,16 @@ class MakropadApp(rumps.App):
         super().__init__("Makropad", icon=resource(ICON_ON), template=True, quit_button=None)
         self.server = None
         self.daemon = None
+        self.prof_items = {}                 # navn -> MenuItem, for avkryssing
+        prof_menu = rumps.MenuItem("Profil")
+        for name in store.NAMES:
+            it = rumps.MenuItem(name, callback=self.switch_profile)
+            self.prof_items[name] = it
+            prof_menu.add(it)
         self.menu = [
             rumps.MenuItem("Åpne konfigurasjon…", callback=self.open_config, key="k"),
             None,
+            prof_menu,
             rumps.MenuItem("Aktiv", callback=self.toggle_active),
             rumps.MenuItem("Klargjør padden…", callback=self.prepare),
             None,
@@ -82,6 +90,7 @@ class MakropadApp(rumps.App):
         self.start_server()
         self.start_daemon()
         self.menu["Start ved innlogging"].state = os.path.exists(AGENT)
+        self.sync_profile_menu()
 
     # ── oppstart ────────────────────────────────────────────────────────
     def start_server(self):
@@ -125,6 +134,22 @@ class MakropadApp(rumps.App):
     # ── meny ────────────────────────────────────────────────────────────
     def open_config(self, _):
         webbrowser.open(URL)
+
+    def switch_profile(self, sender):
+        """Bytt aktiv profil. Skriver fila og tvinger daemonen til å laste den."""
+        store.set_active(sender.title)
+        if self.daemon:
+            self.daemon.load()               # reflekter umiddelbart
+        self.sync_profile_menu()
+
+    def sync_profile_menu(self):
+        """Kryss av den aktive profilen. Leser disk så UI-endringer fanges opp òg."""
+        try:
+            active = store.load()["active"]
+        except Exception:
+            return
+        for name, item in self.prof_items.items():
+            item.state = (name == active)
 
     def toggle_active(self, sender):
         if not dmn.TAP:
@@ -190,6 +215,7 @@ class MakropadApp(rumps.App):
         self.menu["Padde: sjekker…"].title = "Padde: tilkoblet" if ok else "Padde: frakoblet"
         if dmn.TAP and not dmn.is_enabled() and self.menu["Aktiv"].state:
             dmn.set_enabled(True)      # macOS slår av tapen ved treghet
+        self.sync_profile_menu()       # fang opp profilbytte gjort i UI-et
 
 
 if __name__ == "__main__":
